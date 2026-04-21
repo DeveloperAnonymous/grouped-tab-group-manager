@@ -19,15 +19,6 @@ Unlike Chrome/Firefox's built-in tab grouping (which just visually groups tabs b
 - ✦ Groups and snapshots persist across browser restarts
 - ✦ Delete groups with a two-tap confirmation (no accidental deletions)
 
-## Installation (Developer / Temporary)
-
-1. Download and unzip `tab-groups-extension.zip`
-2. Open Firefox and go to `about:debugging`
-3. Click **This Firefox** → **Load Temporary Add-on…**
-4. Select the `manifest.json` file inside the unzipped folder
-
-> Note: Temporary add-ons are removed when Firefox closes. To install permanently, the extension would need to be signed via [addons.mozilla.org](https://addons.mozilla.org).
-
 ## Permissions
 
 | Permission | Why |
@@ -35,22 +26,3 @@ Unlike Chrome/Firefox's built-in tab grouping (which just visually groups tabs b
 | `tabs` | Read and manage open tabs |
 | `storage` | Save group snapshots across sessions |
 | `sessions` | Reserved for future session restore features |
-
-## Limitations (extension vs. native)
-
-Because this is a WebExtension, a few things aren't possible that would work in a full Firefox fork:
-
-- **Privileged pages** (`about:debugging`, `about:addons`, `moz-extension://` pages) cannot be saved or restored — they're excluded from snapshots silently
-- **The group switcher lives in the toolbar popup**, not inline in the tab bar like Safari
-- **Per-window group state** isn't tracked separately — all windows share the same active group
-
-These are all solvable at the native fork level.
-
-## Roadmap (for the native fork)
-
-- [ ] Group switcher strip inline in the browser chrome above the tab bar
-- [ ] Per-window independent group state
-- [ ] Restore privileged pages (full chrome privileges)
-- [ ] Keyboard shortcut to switch groups
-- [ ] Drag tabs between groups
-- [ ] Group import/export
