@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tab Groups</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-title">
+        <span class="header-icon">⬡</span>
+        <span>Tab Groups</span>
+      </div>
+      <div class="header-actions">
+        <button class="btn-icon" id="btn-new-group" title="New group">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <button class="btn-icon" id="btn-settings" title="Settings">⚙</button>
+      </div>
+    </header>
+
+    <!-- Group list -->
+    <div class="groups-list" id="groups-list">
+      <!-- populated by JS -->
+    </div>
+
+    <!-- Status bar -->
+    <div class="statusbar" id="statusbar">
+      <span id="status-text">Ready</span>
+    </div>
+
+    <!-- Delete group warning modal -->
+    <div class="modal-overlay hidden" id="delete-warn-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <span id="delete-warn-title">⚠ Delete group</span>
+          <button class="btn-icon" id="delete-warn-close">✕</button>
+        </div>
+        <p class="warn-text" id="delete-warn-text"></p>
+        <label class="warn-dont-ask">
+          <input type="checkbox" id="delete-warn-dont-ask" />
+          <span>Don't show this again</span>
+        </label>
+        <div class="warn-actions">
+          <button class="btn-cancel" id="delete-warn-cancel">Cancel</button>
+          <button class="btn-confirm-switch" id="delete-warn-confirm">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- About-pages warning modal -->
+    <div class="modal-overlay hidden" id="warn-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <span>⚠ Tabs will be skipped</span>
+          <button class="btn-icon" id="warn-modal-close">✕</button>
+        </div>
+        <p class="warn-text">
+          Some tabs in this group are browser pages (<code>about:</code> or extension pages)
+          that can't be saved. They will be <strong>closed and lost</strong> when you switch groups.
+        </p>
+        <div class="warn-skipped" id="warn-skipped-list"></div>
+        <label class="warn-dont-ask">
+          <input type="checkbox" id="warn-dont-ask" />
+          <span>Don't show this again</span>
+        </label>
+        <div class="warn-actions">
+          <button class="btn-cancel" id="warn-cancel">Cancel</button>
+          <button class="btn-confirm-switch" id="warn-confirm">Switch anyway</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- New group modal -->
+    <div class="modal-overlay hidden" id="modal">
+      <div class="modal">
+        <div class="modal-header">
+          <span>New Group</span>
+          <button class="btn-icon" id="modal-close">✕</button>
+        </div>
+
+        <div class="emoji-picker" id="emoji-picker">
+          <button class="emoji-btn active" data-emoji="📁">📁</button>
+          <button class="emoji-btn" data-emoji="💼">💼</button>
+          <button class="emoji-btn" data-emoji="🔬">🔬</button>
+          <button class="emoji-btn" data-emoji="🎨">🎨</button>
+          <button class="emoji-btn" data-emoji="🎮">🎮</button>
+          <button class="emoji-btn" data-emoji="📚">📚</button>
+          <button class="emoji-btn" data-emoji="🏠">🏠</button>
+          <button class="emoji-btn" data-emoji="🌍">🌍</button>
+          <button class="emoji-btn" data-emoji="🛒">🛒</button>
+          <button class="emoji-btn" data-emoji="⚡">⚡</button>
+        </div>
+
+        <input class="modal-input" id="group-name-input" type="text" placeholder="Group name…" maxlength="24" />
+
+        <div class="color-row" id="color-picker">
+          <button class="color-btn active" data-color="#6c63ff" style="background:#6c63ff"></button>
+          <button class="color-btn" data-color="#e94560" style="background:#e94560"></button>
+          <button class="color-btn" data-color="#00b4d8" style="background:#00b4d8"></button>
+          <button class="color-btn" data-color="#06d6a0" style="background:#06d6a0"></button>
+          <button class="color-btn" data-color="#f4a261" style="background:#f4a261"></button>
+          <button class="color-btn" data-color="#e63946" style="background:#e63946"></button>
+          <button class="color-btn" data-color="#a8dadc" style="background:#a8dadc"></button>
+          <button class="color-btn" data-color="#c77dff" style="background:#c77dff"></button>
+        </div>
+
+        <button class="btn-create" id="btn-create-confirm">Create Group</button>
+      </div>
+    </div>
+
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

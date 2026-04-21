@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grouped — Settings</title>
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <div id="app">
+
+    <header class="header">
+      <div class="header-title">
+        <span class="header-icon">⬡</span>
+        <span>Grouped</span>
+        <span class="header-sub">Settings</span>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <!-- Warnings -->
+      <section class="section">
+        <div class="section-label">Warnings</div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name">Warn when switching groups with skipped tabs</div>
+            <div class="setting-desc">
+              Show a warning when the current group contains <code>about:</code> or browser pages
+              that can't be saved and will be lost on switch.
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="setting-warn-about-pages" />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name">Warn when deleting a group with saved tabs</div>
+            <div class="setting-desc">
+              Show a confirmation before deleting a group that has tabs saved in it.
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="setting-warn-delete-tabs" />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Keyboard shortcuts -->
+      <section class="section">
+        <div class="section-label">Keyboard Shortcuts</div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-name">Navigate groups with keyboard</div>
+            <div class="setting-desc">
+              Cycle through your groups using keyboard shortcuts.
+            </div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="setting-keybinds-enabled" />
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+
+        <div class="keybind-list" id="keybind-list">
+          <div class="keybind-row" id="keybind-row-next">
+            <span class="keybind-action">Next group</span>
+            <div class="keybind-right">
+              <span class="keybind-keys" id="keybind-display-next"></span>
+              <button class="keybind-edit-btn" id="keybind-edit-next">Edit</button>
+            </div>
+          </div>
+          <div class="keybind-row" id="keybind-row-prev">
+            <span class="keybind-action">Previous group</span>
+            <div class="keybind-right">
+              <span class="keybind-keys" id="keybind-display-prev"></span>
+              <button class="keybind-edit-btn" id="keybind-edit-prev">Edit</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Keybind capture overlay -->
+        <div class="keybind-capture hidden" id="keybind-capture">
+          <span class="capture-label">Press your key combination…</span>
+          <span class="capture-preview" id="capture-preview">—</span>
+          <div class="capture-actions">
+            <button class="btn-capture-cancel" id="capture-cancel">Cancel</button>
+            <button class="btn-capture-save" id="capture-save" disabled>Save</button>
+          </div>
+        </div>
+
+        <div class="info-box">
+          <span class="info-icon">ℹ</span>
+          Firefox requires keyboard shortcuts to be registered in the extension manifest.
+          If shortcuts conflict with existing Firefox shortcuts, they may not fire.
+          You can manage all extension shortcuts at <code>about:addons</code> → gear icon → Manage Extension Shortcuts.
+        </div>
+      </section>
+
+      <!-- About -->
+      <section class="section">
+        <div class="section-label">About</div>
+        <div class="about-row">
+          <span class="about-name">Grouped — Tab Group Manager</span>
+          <span class="about-version" id="about-version">v1.0.0</span>
+        </div>
+        <div class="setting-desc" style="margin-top: 6px;">
+          Safari-style tab groups for Firefox. Inactive groups are fully unloaded from memory —
+          only the tabs you're using right now are ever open.
+        </div>
+      </section>
+
+    </main>
+
+    <div class="saved-toast" id="saved-toast">Settings saved</div>
+
+  </div>
+  <script src="settings.js"></script>
+</body>
+</html>

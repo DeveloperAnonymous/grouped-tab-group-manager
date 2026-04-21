@@ -1,0 +1,49 @@
+{
+  "manifest_version": 2,
+  "name": "Grouped — Tab Group Manager",
+  "version": "1.0.0",
+  "description": "Safari-style tab groups for Firefox. Organize your tabs into named groups and switch between them — inactive groups are fully unloaded from memory, so only the tabs you're using right now are ever open.",
+  "author": "DeveloperAnonymous",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "grouped-tab-manager@developeranonymous",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"],
+        "optional": []
+      }
+    }
+  },
+  "permissions": [
+    "tabs",
+    "storage",
+    "sessions"
+  ],
+  "browser_action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Grouped — Tab Group Manager"
+  },
+  "options_ui": {
+    "page": "settings/settings.html",
+    "open_in_tab": true
+  },
+  "commands": {
+    "group-next": {
+      "suggested_key": { "default": "Ctrl+Alt+Down" },
+      "description": "Switch to next group"
+    },
+    "group-prev": {
+      "suggested_key": { "default": "Ctrl+Alt+Up" },
+      "description": "Switch to previous group"
+    }
+  },
+  "background": {
+    "scripts": ["background/background.js"],
+    "persistent": true
+  },
+  "content_security_policy": "script-src 'self'; object-src 'self'",
+  "icons": {
+    "48": "icons/icon48.svg",
+    "96": "icons/icon96.svg"
+  }
+}
