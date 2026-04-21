@@ -21,8 +21,6 @@ Unlike Chrome/Firefox's built-in tab grouping (which just visually groups tabs b
 
 ## Permissions
 
-| Permission | Why |
-|---|---|
-| `tabs` | Read and manage open tabs |
-| `storage` | Save group snapshots across sessions |
-| `sessions` | Reserved for future session restore features |
+- **`tabs`**: Read and manage open tabs
+- **`storage`**: Save group snapshots across sessions
+- **`sessions`**: Reserved for future session restore features

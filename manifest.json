@@ -6,8 +6,8 @@
   "author": "DeveloperAnonymous",
   "browser_specific_settings": {
     "gecko": {
-      "id": "grouped-tab-manager@developeranonymous",
-      "strict_min_version": "140.0",
+      "id": "grouped-tab-group-manager@developeranonymous",
+      "strict_min_version": "142.0",
       "data_collection_permissions": {
         "required": ["none"],
         "optional": []
@@ -43,7 +43,6 @@
   },
   "content_security_policy": "script-src 'self'; object-src 'self'",
   "icons": {
-    "48": "icons/icon48.svg",
-    "96": "icons/icon96.svg"
+    "48": "icons/icon48.svg"
   }
 }
