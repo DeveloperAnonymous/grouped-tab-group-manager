@@ -2,33 +2,25 @@
 //  Grouped — Popup Script
 // ─────────────────────────────────────────────────────────────
 
-let state = null;
+let state = null;   // { groups, activeGroupId, snapshots, isSwitching }
+let currentWindowId = null;
 let settings = {
   warnAboutPages: true,
   warnDeleteTabs: true,
   keybindsEnabled: true,
   keybindNext: { modifiers: ['Ctrl', 'Alt'], key: 'ArrowDown' },
-  keybindPrev: { modifiers: ['Ctrl', 'Alt'], key: 'ArrowUp'   }
+  keybindPrev: { modifiers: ['Ctrl', 'Alt'], key: 'ArrowUp' }
 };
 let isSwitching = false;
 let selectedEmoji = '📁';
 let selectedColor = '#6c63ff';
-
-// Pending switch target while warning modal is open
 let pendingSwitch = null;
+let pendingDelete = null;
 
 // ── Helpers ───────────────────────────────────────────────────
 
 async function send(msg) {
-  return browser.runtime.sendMessage(msg);
-}
-
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return browser.runtime.sendMessage({ ...msg, windowId: currentWindowId });
 }
 
 function setStatus(text) {
@@ -49,7 +41,7 @@ async function loadSettings() {
     warnDeleteTabs: true,
     keybindsEnabled: true,
     keybindNext: { modifiers: ['Ctrl', 'Alt'], key: 'ArrowDown' },
-    keybindPrev: { modifiers: ['Ctrl', 'Alt'], key: 'ArrowUp'   }
+    keybindPrev: { modifiers: ['Ctrl', 'Alt'], key: 'ArrowUp' }
   };
   const result = await browser.storage.local.get('groupedSettings');
   settings = { ...DEFAULTS, ...(result.groupedSettings || {}) };
@@ -65,31 +57,8 @@ function isPrivilegedUrl(url) {
 }
 
 async function getPrivilegedTabsInCurrentWindow() {
-  const tabs = await browser.tabs.query({ currentWindow: true });
+  const tabs = await browser.tabs.query({ windowId: currentWindowId });
   return tabs.filter(t => isPrivilegedUrl(t.url));
-}
-
-// ── Warning modal ─────────────────────────────────────────────
-
-function openWarnModal(skippedTabs, onConfirm) {
-  pendingSwitch = onConfirm;
-
-  const list = document.getElementById('warn-skipped-list');
-  list.textContent = '';
-  for (const t of skippedTabs) {
-    const div = document.createElement('div');
-    div.className = 'warn-skipped-item';
-    div.textContent = t.url;
-    list.appendChild(div);
-  }
-
-  document.getElementById('warn-dont-ask').checked = false;
-  document.getElementById('warn-modal').classList.remove('hidden');
-}
-
-function closeWarnModal() {
-  document.getElementById('warn-modal').classList.add('hidden');
-  pendingSwitch = null;
 }
 
 // ── Render ────────────────────────────────────────────────────
@@ -108,41 +77,38 @@ function renderGroups() {
 
   for (const group of state.groups) {
     const isActive = group.id === state.activeGroupId;
-    const tabCount = isActive
-      ? '— active'
-      : group.snapshot && group.snapshot.length > 0
-        ? `${group.snapshot.length} tab${group.snapshot.length !== 1 ? 's' : ''}`
-        : 'empty';
+    const snapCount = (group.snapshot || []).length;
+    const tabCount = isActive ? '— active' : snapCount > 0 ? `${snapCount} tab${snapCount !== 1 ? 's' : ''}` : 'empty';
 
     const item = document.createElement('div');
     item.className = 'group-item' + (isActive ? ' active' : '');
     item.style.setProperty('--group-color', group.color);
     item.dataset.groupId = group.id;
 
-    // Dot
     const dot = document.createElement('div');
     dot.className = 'group-dot';
 
-    // Emoji
     const emoji = document.createElement('div');
     emoji.className = 'group-emoji';
     emoji.textContent = group.emoji || '📁';
 
-    // Info
     const info = document.createElement('div');
     info.className = 'group-info';
+
     const name = document.createElement('div');
     name.className = 'group-name';
     name.textContent = group.name;
+
     const meta = document.createElement('div');
     meta.className = 'group-meta';
     meta.textContent = tabCount;
+
     info.appendChild(name);
     info.appendChild(meta);
 
-    // Actions
     const actions = document.createElement('div');
     actions.className = 'group-actions';
+
     if (state.groups.length > 1) {
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'group-action-btn delete';
@@ -153,7 +119,6 @@ function renderGroups() {
       actions.appendChild(deleteBtn);
     }
 
-    // Spinner
     const spinner = document.createElement('div');
     spinner.className = 'switching-indicator';
 
@@ -184,12 +149,60 @@ function renderGroups() {
   }
 }
 
+// ── Warning modal (about: pages) ──────────────────────────────
+
+function openWarnModal(skippedTabs, onConfirm) {
+  pendingSwitch = onConfirm;
+
+  const list = document.getElementById('warn-skipped-list');
+  list.textContent = '';
+  for (const t of skippedTabs) {
+    const div = document.createElement('div');
+    div.className = 'warn-skipped-item';
+    div.textContent = t.url;
+    list.appendChild(div);
+  }
+
+  document.getElementById('warn-dont-ask').checked = false;
+  document.getElementById('warn-modal').classList.remove('hidden');
+}
+
+function closeWarnModal() {
+  document.getElementById('warn-modal').classList.add('hidden');
+  pendingSwitch = null;
+}
+
+// ── Delete warning modal ──────────────────────────────────────
+
+function openDeleteWarnModal(title, messageParts, onConfirm) {
+  pendingDelete = onConfirm;
+  document.getElementById('delete-warn-title').textContent = title;
+
+  const p = document.getElementById('delete-warn-text');
+  p.textContent = '';
+  for (const part of messageParts) {
+    if (part.bold) {
+      const strong = document.createElement('strong');
+      strong.textContent = part.text;
+      p.appendChild(strong);
+    } else {
+      p.appendChild(document.createTextNode(part.text));
+    }
+  }
+
+  document.getElementById('delete-warn-dont-ask').checked = false;
+  document.getElementById('delete-warn-modal').classList.remove('hidden');
+}
+
+function closeDeleteWarnModal() {
+  document.getElementById('delete-warn-modal').classList.add('hidden');
+  pendingDelete = null;
+}
+
 // ── Switch handler ────────────────────────────────────────────
 
 async function handleSwitchGroup(groupId, itemEl) {
   if (isSwitching) return;
-
-  // Always reload settings fresh in case they changed in the settings page
   await loadSettings();
 
   if (settings.warnAboutPages) {
@@ -225,65 +238,27 @@ async function doSwitch(groupId, itemEl) {
 
 // ── Delete handler ────────────────────────────────────────────
 
-// ── Delete warning modal ──────────────────────────────────────
-
-let pendingDelete = null;
-
-function openDeleteWarnModal(title, messageParts, onConfirm) {
-  pendingDelete = onConfirm;
-  document.getElementById('delete-warn-title').textContent = title;
-
-  // messageParts is an array of {text, bold} objects
-  const p = document.getElementById('delete-warn-text');
-  p.textContent = '';
-  for (const part of messageParts) {
-    if (part.bold) {
-      const strong = document.createElement('strong');
-      strong.textContent = part.text;
-      p.appendChild(strong);
-    } else {
-      p.appendChild(document.createTextNode(part.text));
-    }
-  }
-
-  document.getElementById('delete-warn-dont-ask').checked = false;
-  document.getElementById('delete-warn-modal').classList.remove('hidden');
-}
-
-function closeDeleteWarnModal() {
-  document.getElementById('delete-warn-modal').classList.add('hidden');
-  pendingDelete = null;
-}
-
-// ── Delete handler ────────────────────────────────────────────
-
 async function handleDeleteGroup(groupId) {
   const group = state.groups.find(g => g.id === groupId);
-  if (!group) return;
-
-  if (state.groups.length <= 1) {
+  if (!group || state.groups.length <= 1) {
     setStatus('Cannot delete the only group');
     return;
   }
 
   const isActive = groupId === state.activeGroupId;
-
-  // Count tabs
   let tabCount = 0;
   if (isActive) {
-    const tabs = await browser.tabs.query({ currentWindow: true });
-    tabCount = tabs.filter(t => t.url && !t.url.startsWith('about:') && !t.url.startsWith('moz-extension:')).length;
+    const tabs = await browser.tabs.query({ windowId: currentWindowId });
+    tabCount = tabs.filter(t => t.url && !isPrivilegedUrl(t.url)).length;
   } else {
-    tabCount = group.snapshot?.length || 0;
+    tabCount = (group.snapshot || []).length;
   }
 
   const needsWarning = settings.warnDeleteTabs && (tabCount > 0 || isActive);
 
   if (needsWarning) {
     const tabLabel = tabCount === 1 ? '1 tab' : `${tabCount} tabs`;
-
     const title = isActive ? '⚠ Deleting current group' : '⚠ Group has saved tabs';
-
     const messageParts = isActive
       ? [
           { text: "You're about to delete " },
@@ -305,7 +280,6 @@ async function handleDeleteGroup(groupId) {
 }
 
 async function doDelete(groupId, group, isActive) {
-  // If deleting the active group, switch to an adjacent one first
   if (isActive) {
     const currentIdx = state.groups.findIndex(g => g.id === groupId);
     const nextGroup = state.groups[currentIdx + 1] || state.groups[currentIdx - 1];
@@ -329,7 +303,7 @@ async function doDelete(groupId, group, isActive) {
   }
 }
 
-// ── Modal ─────────────────────────────────────────────────────
+// ── New group modal ───────────────────────────────────────────
 
 function openModal() {
   document.getElementById('modal').classList.remove('hidden');
@@ -363,8 +337,8 @@ async function handleCreateGroup() {
 document.addEventListener('keydown', (e) => {
   if (!settings.keybindsEnabled || isSwitching || !state) return;
 
-  const next = settings.keybindNext || { modifiers: ['Alt'], key: 'ArrowDown' };
-  const prev = settings.keybindPrev || { modifiers: ['Alt'], key: 'ArrowUp' };
+  const next = settings.keybindNext || { modifiers: ['Ctrl', 'Alt'], key: 'ArrowDown' };
+  const prev = settings.keybindPrev || { modifiers: ['Ctrl', 'Alt'], key: 'ArrowUp' };
 
   function matches(combo) {
     if (e.key !== combo.key) return false;
@@ -381,13 +355,12 @@ document.addEventListener('keydown', (e) => {
   if (!isNext && !isPrev) return;
 
   e.preventDefault();
-  const groups = state.groups;
-  const currentIdx = groups.findIndex(g => g.id === state.activeGroupId);
+  const currentIdx = state.groups.findIndex(g => g.id === state.activeGroupId);
   const nextIdx = isNext
-    ? (currentIdx + 1) % groups.length
-    : (currentIdx - 1 + groups.length) % groups.length;
+    ? (currentIdx + 1) % state.groups.length
+    : (currentIdx - 1 + state.groups.length) % state.groups.length;
 
-  const target = groups[nextIdx];
+  const target = state.groups[nextIdx];
   if (target && target.id !== state.activeGroupId) {
     handleSwitchGroup(target.id, null);
   }
@@ -396,6 +369,21 @@ document.addEventListener('keydown', (e) => {
 // ── Background events ─────────────────────────────────────────
 
 browser.runtime.onMessage.addListener((msg) => {
+  // Snapshot updated by another window — refresh tab counts silently
+  if (msg.type === 'GROUP_SNAPSHOT_UPDATED') {
+    // Re-fetch state so our counts are up to date
+    send({ type: 'GET_STATE' }).then(response => {
+      if (response?.state) {
+        state = response.state;
+        renderGroups();
+      }
+    });
+    return;
+  }
+
+  // Only react to switching events for our own window
+  if (msg.windowId && msg.windowId !== currentWindowId) return;
+
   if (msg.type === 'SWITCHING_STARTED') {
     setLocked(true);
     const target = state?.groups?.find(g => g.id === msg.targetGroupId);
@@ -424,6 +412,10 @@ async function init() {
   setStatus('Loading…');
   await loadSettings();
 
+  // Get this popup's window ID via the current tab (no "windows" permission needed)
+  const currentTab = await browser.tabs.getCurrent();
+  currentWindowId = currentTab?.windowId ?? (await browser.windows.getLastFocused()).id;
+
   const response = await send({ type: 'GET_STATE' });
   if (response?.state) {
     state = response.state;
@@ -450,13 +442,11 @@ async function init() {
     btn.classList.add('active');
   });
 
-  // New group + settings buttons
   document.getElementById('btn-new-group').addEventListener('click', openModal);
   document.getElementById('btn-settings').addEventListener('click', () => {
     browser.runtime.openOptionsPage();
   });
 
-  // New group modal
   document.getElementById('modal-close').addEventListener('click', closeModal);
   document.getElementById('btn-create-confirm').addEventListener('click', handleCreateGroup);
   document.getElementById('group-name-input').addEventListener('keydown', (e) => {
@@ -470,7 +460,7 @@ async function init() {
   document.getElementById('warn-confirm').addEventListener('click', async () => {
     if (document.getElementById('warn-dont-ask').checked) {
       const s = await browser.storage.local.get('groupedSettings');
-      const updated = { warnAboutPages: true, keybindsEnabled: true, ...(s.groupedSettings || {}), warnAboutPages: false };
+      const updated = { ...(s.groupedSettings || {}), warnAboutPages: false };
       await browser.storage.local.set({ groupedSettings: updated });
       settings.warnAboutPages = false;
     }

@@ -1,45 +1,108 @@
 // ─────────────────────────────────────────────────────────────
-//  Tab Groups — Background Script
+//  Grouped — Background Script
+//
+//  State model:
+//    groups[]       — shared: id, name, color, emoji, snapshot[]
+//    windowState{}  — per-window: activeGroupId, isSwitching
+//    lastActiveGroupId — default group for new windows
+//
+//  Snapshot ownership:
+//    A group's snapshot is always updated by whichever window
+//    switches away from it. Last writer wins — this is intentional.
+//    All windows share the same snapshot per group.
 // ─────────────────────────────────────────────────────────────
 
-const DEFAULT_GROUP = {
-  id: 'default',
-  name: 'General',
-  color: '#6c63ff',
-  emoji: '🏠',
-  snapshot: [],
-  createdAt: Date.now()
-};
+let groups = [
+  { id: 'default', name: 'General', color: '#6c63ff', emoji: '🏠', snapshot: [], createdAt: Date.now() }
+];
 
-let state = {
-  groups: [DEFAULT_GROUP],
-  activeGroupId: 'default',
-  isSwitching: false
-};
+// windowState: Map<windowId, { activeGroupId, isSwitching }>
+const windowState = new Map();
+
+let lastActiveGroupId = 'default';
 
 // ── Persistence ───────────────────────────────────────────────
 
 async function saveState() {
-  const { isSwitching, ...toSave } = state;
-  await browser.storage.local.set({ tabGroupsState: toSave });
+  const windowsArray = [...windowState.entries()].map(([winId, ws]) => ({
+    winId,
+    activeGroupId: ws.activeGroupId
+  }));
+
+  await browser.storage.local.set({
+    groupedGroups:      groups,
+    groupedWindows:     windowsArray,
+    groupedLastActive:  lastActiveGroupId
+  });
 }
 
 async function loadState() {
-  const result = await browser.storage.local.get('tabGroupsState');
-  if (result.tabGroupsState) {
-    state = { ...result.tabGroupsState, isSwitching: false };
+  const result = await browser.storage.local.get([
+    'groupedGroups',
+    'groupedWindows',
+    'groupedLastActive'
+  ]);
+
+  if (result.groupedGroups && result.groupedGroups.length > 0) {
+    groups = result.groupedGroups;
+    // Ensure all groups have a snapshot array (migration safety)
+    for (const g of groups) {
+      if (!Array.isArray(g.snapshot)) g.snapshot = [];
+    }
+  }
+
+  if (result.groupedLastActive) {
+    lastActiveGroupId = result.groupedLastActive;
+    if (!groups.find(g => g.id === lastActiveGroupId)) {
+      lastActiveGroupId = groups[0].id;
+    }
+  }
+
+  // Restore per-window active group by window index
+  if (result.groupedWindows && result.groupedWindows.length > 0) {
+    const realWindows = await browser.windows.getAll({ populate: false });
+    result.groupedWindows.forEach((saved, i) => {
+      const realWin = realWindows[i];
+      if (!realWin) return;
+      const activeGroupId = groups.find(g => g.id === saved.activeGroupId)
+        ? saved.activeGroupId
+        : lastActiveGroupId;
+      windowState.set(realWin.id, { activeGroupId, isSwitching: false });
+    });
   }
 }
 
-// ── Tab helpers ───────────────────────────────────────────────
+// ── Window state ──────────────────────────────────────────────
 
-async function captureCurrentTabs(windowId) {
+function getWindowState(windowId) {
+  if (!windowState.has(windowId)) {
+    windowState.set(windowId, {
+      activeGroupId: lastActiveGroupId,
+      isSwitching: false
+    });
+  }
+  return windowState.get(windowId);
+}
+
+function buildStateForWindow(windowId) {
+  const ws = getWindowState(windowId);
+  return {
+    groups,
+    activeGroupId: ws.activeGroupId,
+    isSwitching:   ws.isSwitching,
+    lastActiveGroupId
+  };
+}
+
+// ── Tab capture ───────────────────────────────────────────────
+
+async function captureWindowTabs(windowId) {
   const tabs = await browser.tabs.query({ windowId });
   return tabs
     .map(tab => ({
-      url: tab.url,
-      title: tab.title,
-      pinned: tab.pinned,
+      url:        tab.url,
+      title:      tab.title,
+      pinned:     tab.pinned,
       faviconUrl: tab.favIconUrl || ''
     }))
     .filter(t =>
@@ -50,37 +113,33 @@ async function captureCurrentTabs(windowId) {
     );
 }
 
-// ── Main switch ───────────────────────────────────────────────
+// ── Switch group ──────────────────────────────────────────────
 
 async function switchToGroup(targetGroupId, windowId) {
-  if (state.isSwitching) {
-    console.log('[TabGroups] Blocked: already switching');
-    return { blocked: true };
-  }
-  if (targetGroupId === state.activeGroupId) {
-    return { alreadyActive: true };
-  }
+  const ws = getWindowState(windowId);
 
-  state.isSwitching = true;
-  broadcast({ type: 'SWITCHING_STARTED', targetGroupId });
+  if (ws.isSwitching)                     return { blocked: true };
+  if (targetGroupId === ws.activeGroupId) return { alreadyActive: true };
+
+  const currentGroup = groups.find(g => g.id === ws.activeGroupId);
+  const targetGroup  = groups.find(g => g.id === targetGroupId);
+  if (!targetGroup) return { error: 'Group not found: ' + targetGroupId };
+
+  ws.isSwitching = true;
+  broadcast({ type: 'SWITCHING_STARTED', targetGroupId, windowId });
 
   try {
-    const currentGroup = state.groups.find(g => g.id === state.activeGroupId);
-    const targetGroup  = state.groups.find(g => g.id === targetGroupId);
-    if (!targetGroup) throw new Error('Target group not found: ' + targetGroupId);
-
-    // 1. Snapshot current tabs
+    // 1. Save current tabs into the shared group snapshot
     if (currentGroup) {
-      currentGroup.snapshot = await captureCurrentTabs(windowId);
+      currentGroup.snapshot = await captureWindowTabs(windowId);
+      // Notify all other windows that this group's snapshot updated
+      broadcast({ type: 'GROUP_SNAPSHOT_UPDATED', groupId: currentGroup.id });
     }
 
-    // 2. Create newtab anchor — omit URL, Firefox defaults to about:newtab
-    const anchor = await browser.tabs.create({
-      windowId,
-      active: true
-    });
+    // 2. Anchor tab to keep window alive
+    const anchor = await browser.tabs.create({ windowId, active: true });
 
-    // 3. Close every other tab one at a time
+    // 3. Close all other tabs
     const allTabs = await browser.tabs.query({ windowId });
     for (const tab of allTabs) {
       if (tab.id !== anchor.id) {
@@ -88,61 +147,95 @@ async function switchToGroup(targetGroupId, windowId) {
       }
     }
 
-    // 4. Restore target group tabs
+    // 4. Restore target group's shared snapshot
     const snap = targetGroup.snapshot || [];
     if (snap.length > 0) {
-      // Reuse the anchor tab for the first URL — no newtab flash
       await browser.tabs.update(anchor.id, { url: snap[0].url, active: true });
-
-      // Open the rest as new tabs
       for (let i = 1; i < snap.length; i++) {
         await browser.tabs.create({
           windowId,
-          url: snap[i].url,
+          url:    snap[i].url,
           pinned: snap[i].pinned || false,
           active: false
         });
       }
     }
-    // If snapshot is empty, anchor stays open as a clean newtab
+    // Empty snapshot — anchor stays as clean new tab
 
-    // 5. Commit state
-    state.activeGroupId = targetGroupId;
+    // 5. Commit
+    ws.activeGroupId    = targetGroupId;
+    lastActiveGroupId   = targetGroupId;
     await saveState();
-    broadcast({ type: 'SWITCHING_DONE', state });
+
+    broadcast({ type: 'SWITCHING_DONE', windowId, state: buildStateForWindow(windowId) });
     return { success: true };
 
   } catch (err) {
-    console.error('[TabGroups] Switch failed:', err);
-    broadcast({ type: 'SWITCHING_ERROR', error: err.message });
+    console.error('[Grouped] Switch failed:', err);
+    broadcast({ type: 'SWITCHING_ERROR', windowId, error: err.message });
     return { error: err.message };
   } finally {
-    state.isSwitching = false;
+    ws.isSwitching = false;
   }
 }
 
 // ── Group CRUD ────────────────────────────────────────────────
 
 function createGroup(name, color, emoji) {
-  return {
-    id: 'group_' + Date.now(),
-    name:  name  || 'New Group',
-    color: color || '#6c63ff',
-    emoji: emoji || '📁',
-    snapshot: [],
+  const group = {
+    id:        'group_' + Date.now(),
+    name:      name  || 'New Group',
+    color:     color || '#6c63ff',
+    emoji:     emoji || '📁',
+    snapshot:  [],
     createdAt: Date.now()
   };
+  groups.push(group);
+  return group;
 }
 
 function deleteGroup(id) {
-  if (state.groups.length <= 1) return false; // never delete the last group
-  state.groups = state.groups.filter(g => g.id !== id);
-  // If somehow active group was deleted, fall back to first group
-  if (!state.groups.find(g => g.id === state.activeGroupId)) {
-    state.activeGroupId = state.groups[0].id;
+  if (groups.length <= 1) return false;
+  groups = groups.filter(g => g.id !== id);
+
+  // Any window that was on the deleted group falls back to first available
+  for (const [, ws] of windowState.entries()) {
+    if (ws.activeGroupId === id) {
+      ws.activeGroupId = groups[0].id;
+    }
+  }
+  if (lastActiveGroupId === id) {
+    lastActiveGroupId = groups[0].id;
   }
   return true;
 }
+
+// ── Auto-save snapshot on tab changes ────────────────────────
+// Keeps the shared snapshot fresh so window-close always persists
+
+async function saveGroupSnapshot(windowId) {
+  const ws = windowState.get(windowId);
+  if (!ws || ws.isSwitching) return;
+  const group = groups.find(g => g.id === ws.activeGroupId);
+  if (!group) return;
+  group.snapshot = await captureWindowTabs(windowId);
+  await saveState();
+  broadcast({ type: 'GROUP_SNAPSHOT_UPDATED', groupId: group.id });
+}
+
+browser.tabs.onRemoved.addListener((tabId, info) => {
+  if (!info.isWindowClosing) saveGroupSnapshot(info.windowId);
+});
+browser.tabs.onCreated.addListener((tab) => {
+  saveGroupSnapshot(tab.windowId);
+});
+browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.url) saveGroupSnapshot(tab.windowId);
+});
+
+browser.windows.onRemoved.addListener((windowId) => {
+  windowState.delete(windowId);
+});
 
 // ── Broadcast ─────────────────────────────────────────────────
 
@@ -154,77 +247,76 @@ function broadcast(msg) {
 
 browser.runtime.onMessage.addListener((msg) => {
   return (async () => {
+    const windowId = msg.windowId || (await browser.windows.getLastFocused()).id;
+
     switch (msg.type) {
 
       case 'GET_STATE':
-        return { state };
+        return { state: buildStateForWindow(windowId) };
 
       case 'SWITCH_GROUP': {
-        let windowId = msg.windowId;
-        if (!windowId) {
-          const win = await browser.windows.getLastFocused();
-          windowId = win.id;
-        }
         const result = await switchToGroup(msg.groupId, windowId);
-        return { ...result, state };
+        return { ...result, state: buildStateForWindow(windowId) };
       }
 
       case 'CREATE_GROUP': {
         const group = createGroup(msg.name, msg.color, msg.emoji);
-        state.groups.push(group);
         await saveState();
-        return { state, newGroupId: group.id };
+        return { state: buildStateForWindow(windowId), newGroupId: group.id };
       }
 
       case 'UPDATE_GROUP': {
-        const g = state.groups.find(g => g.id === msg.id);
+        const g = groups.find(g => g.id === msg.id);
         if (g) Object.assign(g, msg.changes);
         await saveState();
-        return { state };
+        return { state: buildStateForWindow(windowId) };
       }
 
       case 'DELETE_GROUP': {
         const ok = deleteGroup(msg.id);
         if (ok) await saveState();
-        return { state, success: ok };
+        return { state: buildStateForWindow(windowId), success: ok };
       }
     }
   })();
 });
 
-// ── Keyboard commands ─────────────────────────────────────────
+// ── Commands ──────────────────────────────────────────────────
 
 browser.commands.onCommand.addListener(async (command) => {
   const result = await browser.storage.local.get('groupedSettings');
   const s = { keybindsEnabled: true, ...(result.groupedSettings || {}) };
-  if (!s.keybindsEnabled || state.isSwitching) return;
-
-  const groups = state.groups;
-  const currentIdx = groups.findIndex(g => g.id === state.activeGroupId);
-  let nextIdx;
-
-  if (command === 'group-next') {
-    nextIdx = (currentIdx + 1) % groups.length;
-  } else if (command === 'group-prev') {
-    nextIdx = (currentIdx - 1 + groups.length) % groups.length;
-  } else {
-    return;
-  }
-
-  const target = groups[nextIdx];
-  if (!target || target.id === state.activeGroupId) return;
+  if (!s.keybindsEnabled) return;
 
   const win = await browser.windows.getLastFocused({ populate: false });
-  await switchToGroup(target.id, win.id);
+  const ws  = getWindowState(win.id);
+  if (ws.isSwitching) return;
+
+  const currentIdx = groups.findIndex(g => g.id === ws.activeGroupId);
+  let nextIdx;
+  if      (command === 'group-next') nextIdx = (currentIdx + 1) % groups.length;
+  else if (command === 'group-prev') nextIdx = (currentIdx - 1 + groups.length) % groups.length;
+  else return;
+
+  const target = groups[nextIdx];
+  if (target && target.id !== ws.activeGroupId) {
+    await switchToGroup(target.id, win.id);
+  }
 });
 
 // ── Init ──────────────────────────────────────────────────────
 
 (async () => {
   await loadState();
-  if (!state.groups.find(g => g.id === 'default')) {
-    state.groups.unshift({ ...DEFAULT_GROUP });
-    await saveState();
+
+  if (groups.length === 0) {
+    groups = [{ id: 'default', name: 'General', color: '#6c63ff', emoji: '🏠', snapshot: [], createdAt: Date.now() }];
   }
-  state.isSwitching = false;
+
+  const openWindows = await browser.windows.getAll({ populate: false });
+  for (const win of openWindows) {
+    getWindowState(win.id);
+  }
+
+  await saveState();
 })();
