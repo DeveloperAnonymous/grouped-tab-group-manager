@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Grouped — Tab Group Manager",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Safari-style tab groups for Firefox. Organize your tabs into named groups and switch between them — inactive groups are fully unloaded from memory, so only the tabs you're using right now are ever open.",
   "author": "DeveloperAnonymous",
   "browser_specific_settings": {

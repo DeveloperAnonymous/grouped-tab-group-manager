@@ -405,3 +405,120 @@ body {
   transition: all 0.15s;
 }
 .btn-confirm-switch:hover { filter: brightness(1.1); }
+
+/* ── Ungrouped state ── */
+.ungrouped-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+.ungrouped-row:hover { background: var(--bg3); border-color: var(--border); }
+.ungrouped-row.active {
+  background: var(--bg3);
+  border-color: var(--border);
+  cursor: default;
+}
+.ungrouped-row.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 3px; height: 60%;
+  border-radius: 0 2px 2px 0;
+  background: var(--text3);
+}
+.ungrouped-label {
+  font-size: 13px;
+  color: var(--text3);
+  font-style: italic;
+}
+.ungrouped-meta {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--mono);
+  margin-top: 1px;
+}
+.groups-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 2px 8px;
+}
+
+/* ── Edit button on group rows ── */
+.group-edit-btn {
+  background: none;
+  border: none;
+  color: var(--text3);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+  transition: all 0.1s;
+}
+.group-edit-btn:hover { background: var(--bg4); color: var(--text2); }
+
+/* ── Modal checkbox (use current tabs) ── */
+.modal-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  padding: 2px 0;
+}
+.modal-checkbox input {
+  accent-color: var(--accent);
+  width: 13px; height: 13px;
+}
+
+/* ── Ungrouped row ── */
+.group-item.ungrouped .group-dot {
+  background: #444 !important;
+}
+
+/* ── Divider ── */
+.group-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 2px;
+}
+.group-divider span {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text3);
+  font-family: var(--mono);
+}
+
+/* ── Edit button ── */
+.group-action-btn.edit {
+  font-size: 13px;
+}
+.group-action-btn.edit:hover {
+  color: var(--accent);
+}
+
+/* ── Modal checkbox (use current tabs) ── */
+.modal-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+}
+.modal-checkbox input {
+  accent-color: var(--accent);
+  width: 13px;
+  height: 13px;
+}

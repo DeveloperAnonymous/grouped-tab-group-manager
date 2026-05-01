@@ -3,17 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tab Groups</title>
+  <title>Grouped</title>
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
   <div id="app">
 
-    <!-- Header -->
     <header class="header">
       <div class="header-title">
         <span class="header-icon">⬡</span>
-        <span>Tab Groups</span>
+        <span>Grouped</span>
       </div>
       <div class="header-actions">
         <button class="btn-icon" id="btn-new-group" title="New group">
@@ -25,17 +24,13 @@
       </div>
     </header>
 
-    <!-- Group list -->
-    <div class="groups-list" id="groups-list">
-      <!-- populated by JS -->
-    </div>
+    <div class="groups-list" id="groups-list"></div>
 
-    <!-- Status bar -->
     <div class="statusbar" id="statusbar">
       <span id="status-text">Ready</span>
     </div>
 
-    <!-- Delete group warning modal -->
+    <!-- Delete warning modal -->
     <div class="modal-overlay hidden" id="delete-warn-modal">
       <div class="modal">
         <div class="modal-header">
@@ -77,12 +72,12 @@
       </div>
     </div>
 
-    <!-- New group modal -->
-    <div class="modal-overlay hidden" id="modal">
+    <!-- Create / Edit group modal -->
+    <div class="modal-overlay hidden" id="group-modal">
       <div class="modal">
         <div class="modal-header">
-          <span>New Group</span>
-          <button class="btn-icon" id="modal-close">✕</button>
+          <span id="group-modal-title">New Group</span>
+          <button class="btn-icon" id="group-modal-close">✕</button>
         </div>
 
         <div class="emoji-picker" id="emoji-picker">
@@ -111,7 +106,13 @@
           <button class="color-btn" data-color="#c77dff" style="background:#c77dff"></button>
         </div>
 
-        <button class="btn-create" id="btn-create-confirm">Create Group</button>
+        <!-- Only shown in create mode -->
+        <label class="modal-checkbox" id="use-current-tabs-row">
+          <input type="checkbox" id="use-current-tabs" checked />
+          <span>Use current tabs</span>
+        </label>
+
+        <button class="btn-create" id="group-modal-confirm">Create Group</button>
       </div>
     </div>
 
